@@ -23,6 +23,8 @@ import random
 import math
 import argparse
 
+from data.read_data import *
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--number_of_segments', type=int, default=1)
@@ -54,7 +56,7 @@ if __name__ == '__main__':
     batch_size = 60  # 10
 
     # Number of GPUs available. Use 0 for CPU mode.
-    ngpu = 4
+    # ngpu = 4
 
     # Number of training epochs
     num_epochs = 50
@@ -76,19 +78,22 @@ if __name__ == '__main__':
 
 
 
-    trainset = dataload.MyDataset(train_path,number_of_segments = number_of_segments)
-    validationset = dataload.MyDataset(validation_path,number_of_segments = number_of_segments)
+    # trainset = dataload.MyDataset(train_path,number_of_segments = number_of_segments)
+    trainset = PunchScratchDataset('/home/weison/Desktop/AIM-skin/1Res3d/data/punch', '/home/weison/Desktop/AIM-skin/1Res3d/data/scratch')
+    # validationset = dataload.MyDataset(validation_path,number_of_segments = number_of_segments)
 
     print(trainset.__len__())
 
+    train_data = DataLoader(trainset, batch_size=4, shuffle=True)
 
-    # Create the test_data
-    train_data = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                             shuffle=True, num_workers=workers)
 
-    # Create the test_data
-    validation_data = torch.utils.data.DataLoader(validationset, batch_size=10,
-                                             shuffle=True, num_workers=workers)
+    # # Create the test_data
+    # train_data = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
+    #                                          shuffle=True, num_workers=workers)
+
+    # # Create the test_data
+    # validation_data = torch.utils.data.DataLoader(validationset, batch_size=10,
+    #                                          shuffle=True, num_workers=workers)
 
 
 
@@ -100,8 +105,8 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Create the generator
     net = Models.Res3D(10,number_of_segments = number_of_segments).to(device)
-    net = nn.DataParallel(net, list(range(ngpu)))
-    print(net)
+    # net = nn.DataParallel(net, list(range(ngpu)))
+    # print(net)
 
 
     """
@@ -119,7 +124,7 @@ if __name__ == '__main__':
     Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 
-    save_path = './result_net/Res3d_s'+ str(number_of_segments) + '.pth'
+    save_path = '/home/weison/Desktop/AIM-skin/1Res3d/checkpoint'+ str(number_of_segments) + '.pth'
     best_acc = 0.0
     Accuracy = []
 
@@ -181,35 +186,35 @@ if __name__ == '__main__':
         ########################################### validate ###########################################
         net.eval()  # 验证过程中关闭 Dropout
         acc = 0.0
-        with torch.no_grad():
-            for val_data in validation_data:
-                val_sensor = val_data[0]  # 获取数据 [10,1,50,8,8]
-                val_sensor = val_sensor.view(val_sensor.size(0),1,math.floor(5000 / number_of_segments),8,8)   # [10*batch_size,1,50,8,8]
+        # with torch.no_grad():
+        #     for val_data in validation_data:
+        #         val_sensor = val_data[0]  # 获取数据 [10,1,50,8,8]
+        #         val_sensor = val_sensor.view(val_sensor.size(0),1,math.floor(5000 / number_of_segments),8,8)   # [10*batch_size,1,50,8,8]
 
-                val_labels = val_data[1]  # label [10]
-                val_labels = val_labels.view( val_labels.size(0))  # [10*batch_size]
+        #         val_labels = val_data[1]  # label [10]
+        #         val_labels = val_labels.view( val_labels.size(0))  # [10*batch_size]
 
-                val_sensor = val_sensor.to(device)  # 转换统一数据格式
-                val_labels = val_labels.to(device)
+        #         val_sensor = val_sensor.to(device)  # 转换统一数据格式
+        #         val_labels = val_labels.to(device)
 
-                outputs = net(val_sensor)
-                predict_y = torch.max(outputs, dim=1)[1]  # 以output中值最大位置对应的索引（标签）作为预测输出
-                acc += (predict_y == val_labels).sum().item()
-            # print('predict_y',predict_y)   #显示结果验证
-            # print('val_labels', val_labels.to(device))
-            val_num = len(validation_data) * len(val_sensor)  #测试集总数
+        #         outputs = net(val_sensor)
+        #         predict_y = torch.max(outputs, dim=1)[1]  # 以output中值最大位置对应的索引（标签）作为预测输出
+        #         acc += (predict_y == val_labels).sum().item()
+        #     # print('predict_y',predict_y)   #显示结果验证
+        #     # print('val_labels', val_labels.to(device))
+        #     val_num = len(validation_data) * len(val_sensor)  #测试集总数
 
 
-            val_accurate = acc / val_num
-            Accuracy.append(val_accurate)
+        #     val_accurate = acc / val_num
+        #     Accuracy.append(val_accurate)
 
-            #保存准确率最高的那次网络参数
-            if val_accurate > best_acc:
-                best_acc = val_accurate
-                torch.save(net.state_dict(), save_path)
+        #     #保存准确率最高的那次网络参数
+        #     if val_accurate > best_acc:
+        #         best_acc = val_accurate
+        #         torch.save(net.state_dict(), save_path)
 
-            print('[epoch %d] train_loss: %.3f  validation_accuracy: %.3f \n' %
-                  (epoch + 1, running_loss / step, val_accurate))
+        #     print('[epoch %d] train_loss: %.3f  validation_accuracy: %.3f \n' %
+        #           (epoch + 1, running_loss / step, val_accurate))
 
     print('Finished Training')
 
